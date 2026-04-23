@@ -1,0 +1,86 @@
+@model List<FlightReservationAdminWeb.Soap.Flight>
+@{
+    ViewData["Title"] = "Lista lotów";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h2 class="mb-0"><i class="bi bi-list-ul me-2"></i>Loty w systemie</h2>
+        <small class="text-muted">Łącznie: @Model.Count</small>
+    </div>
+    <a asp-action="Create" class="btn btn-primary">
+        <i class="bi bi-plus-circle me-1"></i>Dodaj nowy lot
+    </a>
+</div>
+
+@if (!Model.Any())
+{
+    <div class="alert alert-info">
+        <i class="bi bi-info-circle me-2"></i>Brak lotów w bazie.
+        <a asp-action="Create" class="alert-link">Dodaj pierwszy lot</a>.
+    </div>
+}
+else
+{
+    <div class="card shadow-sm">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th style="width:90px;">Zdjęcie</th>
+                        <th>Nr lotu</th>
+                        <th>Trasa</th>
+                        <th>Data</th>
+                        <th>Godzina</th>
+                        <th class="text-end">Cena</th>
+                        <th class="text-center">Miejsca</th>
+                        <th class="text-center" style="width:230px;">Akcje</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var f in Model)
+                    {
+                        <tr>
+                            <td>
+                                @if (f.HasPhoto)
+                                {
+                                    <img src="@Url.Action("Photo", new { id = f.Id })" class="photo-thumb" alt="zdjęcie" />
+                                }
+                                else
+                                {
+                                    <span class="photo-placeholder">brak</span>
+                                }
+                            </td>
+                            <td><strong>@f.FlightNumber</strong></td>
+                            <td>@f.CityFrom <i class="bi bi-arrow-right text-muted"></i> @f.CityTo</td>
+                            <td>@f.DepartureDate.ToString("yyyy-MM-dd")</td>
+                            <td>@f.DepartureTime</td>
+                            <td class="text-end">@f.Price.ToString("F2") PLN</td>
+                            <td class="text-center">
+                                @if (f.AvailableSeats > 0)
+                                {
+                                    <span class="badge bg-success">@f.AvailableSeats</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-danger">0</span>
+                                }
+                            </td>
+                            <td class="text-center">
+                                <a asp-action="Details" asp-route-id="@f.Id" class="btn btn-sm btn-outline-secondary" title="Szczegóły">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                                <a asp-action="Edit" asp-route-id="@f.Id" class="btn btn-sm btn-outline-primary" title="Edytuj">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                                <a asp-action="Delete" asp-route-id="@f.Id" class="btn btn-sm btn-outline-danger" title="Usuń">
+                                    <i class="bi bi-trash"></i>
+                                </a>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}

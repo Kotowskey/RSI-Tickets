@@ -21,7 +21,8 @@ public class FlightReservationServiceImpl : IFlightReservationService
     public List<Flight> GetAllFlights()
     {
         _logger.LogInformation("GetAllFlights called");
-        return _db.Flights.OrderBy(f => f.DepartureDate).ThenBy(f => f.DepartureTime).ToList();
+        var flights = _db.Flights.OrderBy(f => f.DepartureDate).ThenBy(f => f.DepartureTime).ToList();
+        return flights.Select(StripPhotoBytes).ToList();
     }
 
     public List<Flight> SearchFlights(FlightSearchRequest request)
@@ -40,7 +41,17 @@ public class FlightReservationServiceImpl : IFlightReservationService
         if (request.Date.HasValue)
             query = query.Where(f => f.DepartureDate.Date == request.Date.Value.Date);
 
-        return query.OrderBy(f => f.DepartureDate).ThenBy(f => f.DepartureTime).ToList();
+        var flights = query.OrderBy(f => f.DepartureDate).ThenBy(f => f.DepartureTime).ToList();
+        return flights.Select(StripPhotoBytes).ToList();
+    }
+
+    private static Flight StripPhotoBytes(Flight flight)
+    {
+        flight.HasPhoto = flight.PhotoData != null && flight.PhotoData.Length > 0;
+        flight.PhotoData = null;
+        flight.PhotoFileName = null;
+        flight.PhotoContentType = null;
+        return flight;
     }
 
     public TicketPurchaseResponse BuyTicket(TicketPurchaseRequest request)
@@ -258,5 +269,194 @@ public class FlightReservationServiceImpl : IFlightReservationService
     private static string GenerateReservationNumber()
     {
         return $"RES-{DateTime.Now:yyyyMMdd}-{Random.Shared.Next(10000, 99999)}";
+    }
+
+    public FlightOperationResponse AddFlight(FlightAdminRequest request)
+    {
+        _logger.LogInformation("AddFlight called: {FlightNumber} {From}->{To}",
+            request.FlightNumber, request.CityFrom, request.CityTo);
+
+        var validation = ValidateFlightRequest(request);
+        if (validation != null) return validation;
+
+        var flight = new Flight
+        {
+            FlightNumber = request.FlightNumber.Trim(),
+            CityFrom = request.CityFrom.Trim(),
+            CityTo = request.CityTo.Trim(),
+            DepartureDate = request.DepartureDate.Date,
+            DepartureTime = request.DepartureTime.Trim(),
+            Price = request.Price,
+            AvailableSeats = request.AvailableSeats,
+            PhotoData = request.PhotoData,
+            PhotoFileName = request.PhotoFileName,
+            PhotoContentType = request.PhotoContentType,
+        };
+
+        _db.Flights.Add(flight);
+        _db.SaveChanges();
+
+        _logger.LogInformation("Flight added: Id={Id}", flight.Id);
+
+        return new FlightOperationResponse
+        {
+            Success = true,
+            Message = $"Lot {flight.FlightNumber} dodany pomyślnie.",
+            FlightId = flight.Id,
+        };
+    }
+
+    public FlightOperationResponse UpdateFlight(FlightAdminRequest request)
+    {
+        _logger.LogInformation("UpdateFlight called: Id={Id}", request.Id);
+
+        var flight = _db.Flights.Find(request.Id);
+        if (flight == null)
+        {
+            return new FlightOperationResponse
+            {
+                Success = false,
+                Message = "Nie znaleziono lotu o podanym ID.",
+            };
+        }
+
+        var validation = ValidateFlightRequest(request);
+        if (validation != null) return validation;
+
+        flight.FlightNumber = request.FlightNumber.Trim();
+        flight.CityFrom = request.CityFrom.Trim();
+        flight.CityTo = request.CityTo.Trim();
+        flight.DepartureDate = request.DepartureDate.Date;
+        flight.DepartureTime = request.DepartureTime.Trim();
+        flight.Price = request.Price;
+        flight.AvailableSeats = request.AvailableSeats;
+
+        if (request.RemovePhoto)
+        {
+            flight.PhotoData = null;
+            flight.PhotoFileName = null;
+            flight.PhotoContentType = null;
+        }
+        else if (request.PhotoData != null && request.PhotoData.Length > 0)
+        {
+            flight.PhotoData = request.PhotoData;
+            flight.PhotoFileName = request.PhotoFileName;
+            flight.PhotoContentType = request.PhotoContentType;
+        }
+
+        _db.SaveChanges();
+
+        _logger.LogInformation("Flight updated: Id={Id}", flight.Id);
+
+        return new FlightOperationResponse
+        {
+            Success = true,
+            Message = $"Lot {flight.FlightNumber} zaktualizowany.",
+            FlightId = flight.Id,
+        };
+    }
+
+    public FlightOperationResponse DeleteFlight(int flightId)
+    {
+        _logger.LogInformation("DeleteFlight called: Id={Id}", flightId);
+
+        var flight = _db.Flights.Find(flightId);
+        if (flight == null)
+        {
+            return new FlightOperationResponse
+            {
+                Success = false,
+                Message = "Nie znaleziono lotu o podanym ID.",
+            };
+        }
+
+        var hasReservations = _db.Reservations.Any(r => r.FlightId == flightId);
+        if (hasReservations)
+        {
+            return new FlightOperationResponse
+            {
+                Success = false,
+                Message = "Nie można usunąć lotu — istnieją powiązane rezerwacje.",
+                FlightId = flightId,
+            };
+        }
+
+        _db.Flights.Remove(flight);
+        _db.SaveChanges();
+
+        _logger.LogInformation("Flight deleted: Id={Id}", flightId);
+
+        return new FlightOperationResponse
+        {
+            Success = true,
+            Message = $"Lot {flight.FlightNumber} usunięty.",
+            FlightId = flightId,
+        };
+    }
+
+    public Flight? GetFlight(int flightId)
+    {
+        _logger.LogInformation("GetFlight called: Id={Id}", flightId);
+        var flight = _db.Flights.Find(flightId);
+        return flight == null ? null : StripPhotoBytes(flight);
+    }
+
+    public FlightPhotoResponse GetFlightPhoto(int flightId)
+    {
+        _logger.LogInformation("GetFlightPhoto called: Id={Id}", flightId);
+
+        var flight = _db.Flights
+            .AsNoTracking()
+            .FirstOrDefault(f => f.Id == flightId);
+
+        if (flight == null)
+        {
+            return new FlightPhotoResponse
+            {
+                Success = false,
+                Message = "Nie znaleziono lotu o podanym ID.",
+            };
+        }
+
+        if (flight.PhotoData == null || flight.PhotoData.Length == 0)
+        {
+            return new FlightPhotoResponse
+            {
+                Success = false,
+                Message = "Lot nie posiada zdjęcia.",
+            };
+        }
+
+        return new FlightPhotoResponse
+        {
+            Success = true,
+            Message = "OK",
+            PhotoData = flight.PhotoData,
+            FileName = flight.PhotoFileName,
+            ContentType = flight.PhotoContentType ?? "application/octet-stream",
+        };
+    }
+
+    private static FlightOperationResponse? ValidateFlightRequest(FlightAdminRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.FlightNumber))
+            return Fail("Numer lotu jest wymagany.");
+        if (string.IsNullOrWhiteSpace(request.CityFrom))
+            return Fail("Miasto wylotu jest wymagane.");
+        if (string.IsNullOrWhiteSpace(request.CityTo))
+            return Fail("Miasto przylotu jest wymagane.");
+        if (string.IsNullOrWhiteSpace(request.DepartureTime))
+            return Fail("Godzina wylotu jest wymagana.");
+        if (request.Price < 0)
+            return Fail("Cena nie może być ujemna.");
+        if (request.AvailableSeats < 0)
+            return Fail("Liczba wolnych miejsc nie może być ujemna.");
+        return null;
+
+        static FlightOperationResponse Fail(string msg) => new()
+        {
+            Success = false,
+            Message = msg,
+        };
     }
 }

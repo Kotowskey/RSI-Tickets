@@ -3,10 +3,13 @@ using System.Runtime.Serialization;
 namespace FlightReservationService.Models;
 
 [DataContract]
-public class Flight
+public class FlightAdminRequest
 {
     [DataMember]
     public int Id { get; set; }
+
+    [DataMember]
+    public string FlightNumber { get; set; } = string.Empty;
 
     [DataMember]
     public string CityFrom { get; set; } = string.Empty;
@@ -27,12 +30,14 @@ public class Flight
     public int AvailableSeats { get; set; }
 
     [DataMember]
-    public string FlightNumber { get; set; } = string.Empty;
+    public byte[]? PhotoData { get; set; }
 
     [DataMember]
-    public bool HasPhoto { get; set; }
-
-    public byte[]? PhotoData { get; set; }
     public string? PhotoFileName { get; set; }
+
+    [DataMember]
     public string? PhotoContentType { get; set; }
+
+    [DataMember]
+    public bool RemovePhoto { get; set; }
 }

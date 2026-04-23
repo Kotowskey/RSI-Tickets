@@ -19,6 +19,9 @@ public class AppDbContext : DbContext
             entity.Property(e => e.CityFrom).IsRequired().HasMaxLength(100);
             entity.Property(e => e.CityTo).IsRequired().HasMaxLength(100);
             entity.Property(e => e.Price).HasColumnType("decimal(10,2)");
+            entity.Property(e => e.PhotoFileName).HasMaxLength(200);
+            entity.Property(e => e.PhotoContentType).HasMaxLength(100);
+            entity.Ignore(e => e.HasPhoto);
         });
 
         modelBuilder.Entity<Reservation>(entity =>

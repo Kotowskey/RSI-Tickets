@@ -1,0 +1,38 @@
+@model FlightReservationAdminWeb.Soap.Flight
+@{
+    ViewData["Title"] = "Usuń lot";
+}
+
+<div class="mb-3">
+    <h2 class="mb-0 text-danger"><i class="bi bi-exclamation-triangle me-2"></i>Usuń lot</h2>
+    <small class="text-muted">Operacja nieodwracalna. Lot z aktywnymi rezerwacjami nie zostanie usunięty.</small>
+</div>
+
+<div class="card border-danger shadow-sm">
+    <div class="card-body">
+        <h5 class="card-title">Czy na pewno chcesz usunąć poniższy lot?</h5>
+        <dl class="row">
+            <dt class="col-sm-3">Numer lotu</dt>
+            <dd class="col-sm-9">@Model.FlightNumber</dd>
+
+            <dt class="col-sm-3">Trasa</dt>
+            <dd class="col-sm-9">@Model.CityFrom <i class="bi bi-arrow-right"></i> @Model.CityTo</dd>
+
+            <dt class="col-sm-3">Data / godzina</dt>
+            <dd class="col-sm-9">@Model.DepartureDate.ToString("yyyy-MM-dd") @Model.DepartureTime</dd>
+
+            <dt class="col-sm-3">Cena</dt>
+            <dd class="col-sm-9">@Model.Price.ToString("F2") PLN</dd>
+
+            <dt class="col-sm-3">Wolne miejsca</dt>
+            <dd class="col-sm-9">@Model.AvailableSeats</dd>
+        </dl>
+
+        <form asp-action="Delete" asp-route-id="@Model.Id" method="post">
+            <button type="submit" class="btn btn-danger">
+                <i class="bi bi-trash me-1"></i>Tak, usuń lot
+            </button>
+            <a asp-action="Details" asp-route-id="@Model.Id" class="btn btn-outline-secondary">Anuluj</a>
+        </form>
+    </div>
+</div>

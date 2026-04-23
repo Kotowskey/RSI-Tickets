@@ -2,10 +2,11 @@
 
 ## Opis projektu
 
-System rezerwacji biletów lotniczych oparty o architekturę SOA (Service-Oriented Architecture) z wykorzystaniem protokołu SOAP. Projekt składa się z dwóch komponentów:
+System rezerwacji biletów lotniczych oparty o architekturę SOA (Service-Oriented Architecture) z wykorzystaniem protokołu SOAP. Projekt składa się z trzech niezależnych modułów:
 
-1. **Web Serwis SOAP** (.NET 9 / ASP.NET Core + SoapCore) — serwer udostępniający operacje wyszukiwania lotów, zakupu biletów, sprawdzania rezerwacji i generowania potwierdzeń PDF
-2. **Aplikacja kliencka** (Python + tkinter) — desktopowa aplikacja okienkowa konsumująca web serwis SOAP za pomocą biblioteki `zeep`
+1. **Web Serwis SOAP** (`FlightReservationService/`, .NET 9 / ASP.NET Core + SoapCore) — serwer udostępniający operacje wyszukiwania lotów, zakupu biletów, sprawdzania rezerwacji, generowania potwierdzeń PDF oraz pełne CRUD dla lotów (admin)
+2. **Aplikacja kliencka — okienkowa** (`FlightReservationClient/`, Python + tkinter) — desktopowa aplikacja konsumująca web serwis SOAP za pomocą biblioteki `zeep` (kupno biletów, sprawdzanie rezerwacji, pobieranie PDF)
+3. **Panel administracyjny — web** (`FlightReservationAdminWeb/`, .NET 9 / ASP.NET Core MVC) — aplikacja w przeglądarce dla administratora (pełne CRUD lotów, upload zdjęć), konsumująca ten sam web serwis SOAP przez `ChannelFactory<T>` i WCF
 
 ### Wymagania funkcjonalne
 
@@ -22,26 +23,48 @@ System rezerwacji biletów lotniczych oparty o architekturę SOA (Service-Orient
 | Wymaganie | Status | Opis realizacji |
 |---|---|---|
 | Web serwis SOAP | ✅ | ASP.NET Core 9 + SoapCore, WSDL auto-generowany |
-| Aplikacja kliencka | ✅ | Python 3 + tkinter (GUI) + zeep (SOAP) |
-| MTOM / załączniki binarne | ✅ | PDF generowany przez QuestPDF, przesyłany jako `base64Binary` w SOAP |
+| Klient okienkowy | ✅ | Python 3 + tkinter (GUI) + zeep (SOAP) |
+| Klient w przeglądarce | ✅ | ASP.NET Core 9 MVC + Bootstrap 5, `ChannelFactory<T>` (WCF) |
+| 3 niezależne moduły | ✅ | Serwis + klient okienkowy + panel web |
+| MTOM / załączniki binarne | ✅ | PDF generowany przez QuestPDF + zdjęcia lotów — `base64Binary` w SOAP |
+| Upload plików (zdjęcia) | ✅ | Admin web wysyła zdjęcia JPG/PNG do serwisu SOAP przez `byte[]` |
+| Pełny CRUD dla klasy | ✅ | `Flight` — Create / Read / Update / Delete przez panel admina |
 | Handlers | ✅ | `IServiceOperationTuner` + middleware logujący komunikaty SOAP |
 | SSL/TLS (HTTPS) | ✅ | Kestrel nasłuchuje na porcie 5001 (HTTPS) |
-| Klient w innym języku | ✅ | Serwis: C# (.NET), Klient: Python |
+| Klient w innym języku | ✅ | Serwis: C# (.NET), Klient 1: Python (zeep), Klient 2: C# (WCF) |
+| Przechowywanie danych | ✅ | SQLite przez Entity Framework Core (plik `flights.db`) |
 
 ---
 
 ## Architektura
 
 ```
-┌─────────────────────────────┐         SOAP/HTTP(S)         ┌──────────────────────────────┐
-│     Klient Python           │ ◄──────────────────────────► │    Web Serwis .NET           │
-│  (tkinter + zeep)           │         WSDL + XML           │  (ASP.NET Core + SoapCore)   │
-│                             │                               │                              │
-│  • Wyszukiwanie lotów       │                               │  • IFlightReservationService │
-│  • Zakup biletu             │                               │  • SQLite (EF Core)          │
-│  • Sprawdzenie rezerwacji   │                               │  • QuestPDF (generowanie)    │
-│  • Pobranie PDF             │                               │  • SOAP Handlers             │
-└─────────────────────────────┘                               └──────────────────────────────┘
+┌─────────────────────────────┐                              ┌──────────────────────────────┐
+│  Klient Python (tkinter)    │                              │   Panel Web (ASP.NET MVC)    │
+│   FlightReservationClient   │                              │   FlightReservationAdminWeb  │
+│                             │                              │                              │
+│  • Wyszukiwanie lotów       │                              │  • Lista lotów (CRUD)        │
+│  • Zakup biletu             │                              │  • Dodawanie / edycja lotów  │
+│  • Sprawdzenie rezerwacji   │                              │  • Upload zdjęć (PNG/JPG)    │
+│  • Pobranie PDF             │                              │  • Podgląd szczegółów        │
+└──────────────┬──────────────┘                              └──────────────┬───────────────┘
+               │                                                            │
+               │ SOAP/HTTP(S)    WSDL + XML         SOAP/HTTP(S)            │
+               │ (zeep)                             (ChannelFactory)        │
+               │                                                            │
+               └──────────────────────┐      ┌─────────────────────────────┘
+                                      ▼      ▼
+                    ┌──────────────────────────────────────────┐
+                    │     Web Serwis SOAP (ASP.NET + SoapCore) │
+                    │       FlightReservationService           │
+                    │                                          │
+                    │  • IFlightReservationService (kontrakt)  │
+                    │  • 10 operacji (5 user + 5 admin CRUD)   │
+                    │  • SQLite (EF Core) – flights.db         │
+                    │  • QuestPDF (generowanie potwierdzeń)    │
+                    │  • Handlers + middleware (logowanie)     │
+                    │  • HTTP 5000 / HTTPS 5001                │
+                    └──────────────────────────────────────────┘
 ```
 
 ---
@@ -113,6 +136,44 @@ Generuje i zwraca potwierdzenie rezerwacji w formacie PDF (załącznik binarny).
 - `Message` (string)
 - `PdfData` (base64Binary) — dane PDF
 - `FileName` (string) — nazwa pliku
+
+#### 6. `AddFlight` (admin)
+Dodaje nowy lot. Obsługuje opcjonalny upload zdjęcia jako `base64Binary`.
+
+**Request:** `FlightAdminRequest`
+- `FlightNumber`, `CityFrom`, `CityTo`, `DepartureTime` (string)
+- `DepartureDate` (dateTime), `Price` (decimal), `AvailableSeats` (int)
+- `PhotoData` (base64Binary, opcjonalne), `PhotoFileName`, `PhotoContentType` (string, opcjonalne)
+
+**Response:** `FlightOperationResponse` — `Success`, `Message`, `FlightId` (ID nowo utworzonego lotu)
+
+#### 7. `UpdateFlight` (admin)
+Aktualizuje dane istniejącego lotu. Pozwala wymienić zdjęcie lub usunąć je przez flagę `RemovePhoto`.
+
+**Request:** `FlightAdminRequest` (z polem `Id`)
+
+**Response:** `FlightOperationResponse`
+
+#### 8. `DeleteFlight` (admin)
+Usuwa lot. Odmawia usunięcia, jeśli lot ma aktywne rezerwacje.
+
+**Request:** `flightId` (int)
+
+**Response:** `FlightOperationResponse`
+
+#### 9. `GetFlight`
+Zwraca pojedynczy lot po ID (bez bajtów zdjęcia — tylko flaga `HasPhoto`).
+
+**Request:** `flightId` (int)
+
+**Response:** `Flight` lub `null` jeśli nie znaleziono
+
+#### 10. `GetFlightPhoto`
+Zwraca binarne zdjęcie lotu (załącznik `base64Binary`).
+
+**Request:** `flightId` (int)
+
+**Response:** `FlightPhotoResponse` — `Success`, `Message`, `PhotoData`, `FileName`, `ContentType`
 
 ### Typy danych (XSD)
 
@@ -276,7 +337,7 @@ Serwis uruchomi się na:
 
 Baza danych SQLite (`flights.db`) zostanie automatycznie utworzona i wypełniona przykładowymi lotami.
 
-### 2. Uruchomienie klienta Python
+### 2. Uruchomienie klienta Python (okienkowego)
 
 ```bash
 cd FlightReservationClient
@@ -284,13 +345,44 @@ pip install -r requirements.txt
 python main.py
 ```
 
-### 3. Obsługa aplikacji klienckiej
+### 3. Uruchomienie panelu administracyjnego (web)
+
+W osobnym terminalu, przy działającym serwisie SOAP:
+
+```bash
+cd FlightReservationAdminWeb
+dotnet run
+```
+
+Panel admina uruchomi się na:
+- **HTTP:** http://localhost:5002
+- **HTTPS:** https://localhost:5003
+
+Otwórz adres w przeglądarce. Panel komunikuje się z serwisem SOAP przez `ChannelFactory<IFlightReservationService>` (WCF) — URL serwisu można zmienić w `FlightReservationAdminWeb/appsettings.json`:
+
+```json
+"SoapService": {
+  "Url": "http://localhost:5000/FlightService.asmx"
+}
+```
+
+### 4. Obsługa aplikacji klienckiej (tkinter)
 
 1. **Połączenie** — kliknij „Połącz" (domyślnie HTTP na porcie 5000). Zaznacz „HTTPS" dla SSL/TLS.
 2. **Wyszukiwanie lotów** — zakładka „Wyszukiwanie lotów", opcjonalnie wpisz kryteria i kliknij „Szukaj".
 3. **Kupno biletu** — zakładka „Kup bilet", wpisz ID lotu, imię i email, kliknij „Kup bilet".
 4. **Sprawdzenie rezerwacji** — zakładka „Sprawdź rezerwację", wpisz numer rezerwacji.
 5. **Pobranie PDF** — kliknij „Pobierz PDF" aby pobrać i zapisać potwierdzenie.
+
+### 5. Obsługa panelu administracyjnego (web)
+
+1. **Lista lotów** — strona główna `/Flights` pokazuje tabelę wszystkich lotów z miniaturami zdjęć.
+2. **Dodawanie lotu** — przycisk „Dodaj nowy lot" → formularz z polami lotu + opcjonalnym uploadem zdjęcia (JPG/PNG).
+3. **Edycja lotu** — przycisk „Edytuj" przy loście → zmiana danych, wymiana lub usunięcie zdjęcia.
+4. **Szczegóły lotu** — przycisk „oko" → widok ze zdjęciem w pełnym rozmiarze + tabela szczegółów.
+5. **Usuwanie lotu** — przycisk „kosz" → strona potwierdzenia. Lot z aktywnymi rezerwacjami nie zostanie usunięty (zwraca błąd z serwisu).
+
+> **Uwaga:** Przy pierwszym uruchomieniu po aktualizacji serwis automatycznie wykryje stary schemat bazy (bez kolumn `Photo*`) i przebuduje plik `flights.db`. Wszystkie wcześniejsze rezerwacje zostaną utracone — taki koszt uproszczonego podejścia bez migracji EF.
 
 ---
 
@@ -349,9 +441,23 @@ Zaimplementowano dwa mechanizmy obsługi (handlers):
 
 2. **`SoapMessageLoggingMiddleware`** — middleware ASP.NET Core przechwytujący pełne komunikaty SOAP (request i response) i logujący je w konsoli serwera. Umożliwia podgląd przesyłanych komunikatów XML.
 
-### Przesyłanie załączników binarnych (PDF)
+### Przesyłanie załączników binarnych (PDF i zdjęcia)
 
-Operacja `GetReservationPdf` generuje dokument PDF za pomocą biblioteki **QuestPDF** i zwraca go jako tablicę bajtów (`byte[]`) zakodowaną w base64 wewnątrz komunikatu SOAP (element `PdfData` typu `xsd:base64Binary`). Klient dekoduje base64 i zapisuje plik PDF.
+- **Download PDF (serwer → klient)**: `GetReservationPdf` generuje dokument PDF za pomocą biblioteki **QuestPDF** i zwraca go jako `byte[]` w polu `PdfData` (SOAP `xsd:base64Binary`). Klient dekoduje i zapisuje plik.
+- **Upload zdjęć (klient → serwer)**: operacje `AddFlight` / `UpdateFlight` przyjmują pole `PhotoData` typu `byte[]` (SOAP `xsd:base64Binary`) wraz z `PhotoFileName` i `PhotoContentType`. Panel admina wczytuje plik obrazka (`IFormFile`), strumień bajtów trafia bezpośrednio do komunikatu SOAP.
+- **Download zdjęć (serwer → klient)**: operacja `GetFlightPhoto` zwraca `byte[]` z obrazkiem, a kontroler `FlightsController.Photo(id)` strumieniuje go do przeglądarki jako `<img src="...">`.
+- `ReaderQuotas.MaxStringContentLength` ustawiony na 10 MB po stronie serwera + `MaxReceivedMessageSize` 20 MB po stronie klienta WCF pozwalają przesyłać zdjęcia do ~10 MB.
+
+### Panel administracyjny (klient w przeglądarce)
+
+Moduł `FlightReservationAdminWeb` jest drugim klientem SOAP w architekturze — napisanym w C# / ASP.NET Core 9 MVC. W odróżnieniu od klienta Python (zeep) używa **WCF**: `ChannelFactory<IFlightReservationService>` z `CustomBinding` dopasowanym do konfiguracji serwera:
+
+- `TextMessageEncodingBindingElement` z `MessageVersion.Soap11WSAddressingAugust2004`
+- `HttpTransportBindingElement` / `HttpsTransportBindingElement` z powiększonym `MaxReceivedMessageSize` (20 MB na upload zdjęć)
+
+Dzięki temu stos prezentuje **interoperacyjność WSDL** z dwóch stron: ten sam serwis SOAP jest konsumowany przez klienta Pythonowego (dynamiczny proxy z WSDL) i klienta .NET (statyczny kontrakt przez interfejs). Zawartość komunikatów XML jest identyczna.
+
+Stos UI admina: **Bootstrap 5** (CDN), **Bootstrap Icons**, walidacja formularzy przez `jQuery Validation Unobtrusive` + atrybuty DataAnnotations w `FlightFormModel`.
 
 ### SSL/TLS
 
@@ -386,28 +492,55 @@ Middleware automatycznie loguje wszystkie komunikaty SOAP request/response w kon
 rsi-projekt1/
 ├── FlightReservationService/          # Web Serwis SOAP (.NET 9)
 │   ├── Models/                        # Modele danych (DataContract)
-│   │   ├── Flight.cs                  # Model lotu
-│   │   ├── Reservation.cs            # Model rezerwacji
-│   │   ├── FlightSearchRequest.cs    # Request wyszukiwania
-│   │   ├── TicketPurchaseRequest.cs  # Request zakupu
-│   │   ├── TicketPurchaseResponse.cs # Response zakupu
-│   │   ├── ReservationDetails.cs     # Szczegóły rezerwacji
-│   │   └── PdfResponse.cs           # Response z PDF
+│   │   ├── Flight.cs                  # Model lotu (+ pola zdjęcia)
+│   │   ├── Reservation.cs             # Model rezerwacji
+│   │   ├── FlightSearchRequest.cs     # Request wyszukiwania
+│   │   ├── TicketPurchaseRequest.cs   # Request zakupu
+│   │   ├── TicketPurchaseResponse.cs  # Response zakupu
+│   │   ├── ReservationDetails.cs      # Szczegóły rezerwacji
+│   │   ├── PdfResponse.cs             # Response z PDF
+│   │   ├── FlightAdminRequest.cs      # Request CRUD admina (Add/Update)
+│   │   ├── FlightOperationResponse.cs # Response CRUD admina
+│   │   └── FlightPhotoResponse.cs     # Response ze zdjęciem lotu
 │   ├── Services/
-│   │   ├── IFlightReservationService.cs  # Kontrakt serwisu (ServiceContract)
-│   │   └── FlightReservationServiceImpl.cs # Implementacja serwisu
+│   │   ├── IFlightReservationService.cs    # Kontrakt serwisu (10 operacji)
+│   │   └── FlightReservationServiceImpl.cs # Implementacja serwisu + CRUD
 │   ├── Data/
-│   │   └── AppDbContext.cs           # Entity Framework DbContext + seed
+│   │   └── AppDbContext.cs            # Entity Framework DbContext + seed
 │   ├── Handlers/
-│   │   ├── SoapLoggingHandler.cs     # Handler SoapCore (IServiceOperationTuner)
-│   │   └── SoapMessageLoggingMiddleware.cs # Middleware logujący SOAP
-│   ├── Program.cs                    # Konfiguracja aplikacji
+│   │   ├── SoapLoggingHandler.cs             # Handler (IServiceOperationTuner)
+│   │   └── SoapMessageLoggingMiddleware.cs   # Middleware logujący SOAP
+│   ├── Program.cs                     # Konfiguracja aplikacji + auto-migracja
 │   └── appsettings.json
-├── FlightReservationClient/          # Klient Python
-│   ├── main.py                       # Aplikacja okienkowa (tkinter)
-│   ├── soap_client.py               # Wrapper SOAP (zeep)
-│   └── requirements.txt             # Zależności Python
-└── README.md                         # Dokumentacja
+│
+├── FlightReservationClient/           # Klient Python (okienkowy)
+│   ├── main.py                        # Aplikacja okienkowa (tkinter)
+│   ├── soap_client.py                 # Wrapper SOAP (zeep)
+│   └── requirements.txt               # Zależności Python
+│
+├── FlightReservationAdminWeb/         # Panel admina (ASP.NET Core MVC)
+│   ├── Soap/
+│   │   ├── Contracts.cs               # DTO + IFlightReservationService (proxy)
+│   │   └── SoapClientFactory.cs       # ChannelFactory<T> + CustomBinding (WCF)
+│   ├── Controllers/
+│   │   ├── HomeController.cs          # Redirect do /Flights
+│   │   └── FlightsController.cs       # CRUD: Index/Details/Create/Edit/Delete/Photo
+│   ├── Models/
+│   │   └── FlightFormModel.cs         # ViewModel formularzy + walidacja
+│   ├── Views/
+│   │   ├── Shared/_Layout.cshtml      # Layout Bootstrap 5
+│   │   ├── Home/Error.cshtml
+│   │   └── Flights/                   # Widoki Razor
+│   │       ├── Index.cshtml           # Lista lotów z miniaturkami
+│   │       ├── Details.cshtml         # Szczegóły lotu + zdjęcie
+│   │       ├── Create.cshtml          # Formularz dodawania + upload
+│   │       ├── Edit.cshtml            # Formularz edycji + wymiana zdjęcia
+│   │       └── Delete.cshtml          # Potwierdzenie usunięcia
+│   ├── Program.cs                     # Konfiguracja Kestrel (porty 5002/5003)
+│   ├── appsettings.json               # Konfiguracja (URL serwisu SOAP)
+│   └── FlightReservationAdminWeb.csproj
+│
+└── README.md                          # Dokumentacja
 ```
 
 ---
@@ -416,5 +549,7 @@ rsi-projekt1/
 
 1. Na **komputerze A** uruchom serwis: `dotnet run` w katalogu `FlightReservationService`
 2. Sprawdź adres IP komputera A (np. `ipconfig` → `192.168.1.100`)
-3. Na **komputerze B** zmień URL w kliencie na: `http://192.168.1.100:5000/FlightService.asmx?wsdl`
-4. Upewnij się, że firewall zezwala na połączenia na porcie 5000/5001
+3. Na **komputerze B**:
+   - **Klient Python**: wpisz URL `http://192.168.1.100:5000/FlightService.asmx?wsdl` w polu WSDL
+   - **Panel admina (web)**: uruchom `dotnet run` w `FlightReservationAdminWeb/`, edytując wcześniej `appsettings.json` → `SoapService.Url = "http://192.168.1.100:5000/FlightService.asmx"`. Panel będzie dostępny pod `http://localhost:5002` na komputerze B.
+4. Upewnij się, że firewall na komputerze A zezwala na połączenia przychodzące na portach **5000/5001**. Porty **5002/5003** (admin) nasłuchują lokalnie na komputerze B.

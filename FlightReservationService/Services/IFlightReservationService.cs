@@ -20,4 +20,19 @@ public interface IFlightReservationService
 
     [OperationContract]
     PdfResponse GetReservationPdf(string reservationNumber);
+
+    [OperationContract]
+    FlightOperationResponse AddFlight(FlightAdminRequest request);
+
+    [OperationContract]
+    FlightOperationResponse UpdateFlight(FlightAdminRequest request);
+
+    [OperationContract]
+    FlightOperationResponse DeleteFlight(int flightId);
+
+    [OperationContract]
+    Flight? GetFlight(int flightId);
+
+    [OperationContract]
+    FlightPhotoResponse GetFlightPhoto(int flightId);
 }

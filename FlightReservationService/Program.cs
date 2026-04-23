@@ -28,6 +28,21 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+    if (db.Database.CanConnect())
+    {
+        try
+        {
+            _ = db.Flights.AsNoTracking()
+                .Select(f => new { f.PhotoFileName })
+                .FirstOrDefault();
+        }
+        catch
+        {
+            db.Database.EnsureDeleted();
+        }
+    }
+
     db.Database.EnsureCreated();
 }
 
