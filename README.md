@@ -322,6 +322,72 @@ Zwraca binarne zdjęcie lotu (załącznik `base64Binary`).
 - **.NET 9 SDK** (lub nowszy)
 - **Python 3.10+** z pip
 - (Opcjonalnie) **SoapUI** do monitorowania komunikatów SOAP
+- **Docker + Docker Compose** (opcjonalnie, alternatywa dla uruchamiania ręcznego)
+
+### Szybki start przez Docker Compose
+
+W katalogu głównym projektu:
+
+```bash
+docker compose up --build -d
+```
+
+Jeśli Twoja wersja Dockera nie wspiera `docker compose`, użyj:
+
+```bash
+docker-compose up --build -d
+```
+
+Dostępne adresy po uruchomieniu:
+- SOAP (HTTP): `http://localhost:5000/FlightService.asmx`
+- WSDL (HTTP): `http://localhost:5000/FlightService.asmx?wsdl`
+- Panel admina (HTTP): `http://localhost:5002`
+
+Zatrzymanie:
+
+```bash
+docker compose down
+```
+
+Alternatywnie (starszy CLI):
+
+```bash
+docker-compose down
+```
+
+> W trybie Docker Compose domyślnie włączony jest tylko HTTP (HTTPS wyłączone dla uproszczenia pracy kontenerów bez certyfikatu). Dane SQLite są trzymane w wolumenie `soap-db-data`, więc przetrwają restart kontenerów.
+
+### Docker Compose z HTTPS
+
+1. Wygeneruj certyfikat `.pfx` w katalogu `certs/`:
+
+```bash
+mkdir -p certs
+dotnet dev-certs https -ep ./certs/aspnetapp.pfx -p "changeit123"
+```
+
+2. Uruchom stack z nakładką HTTPS:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.https.yml up --build -d
+```
+
+Jeśli używasz starszego CLI:
+
+```bash
+docker-compose -f docker-compose.yml -f docker-compose.https.yml up --build -d
+```
+
+Dostępne adresy HTTPS:
+- SOAP (HTTPS): `https://localhost:5001/FlightService.asmx`
+- WSDL (HTTPS): `https://localhost:5001/FlightService.asmx?wsdl`
+- Panel admina (HTTPS): `https://localhost:5003`
+
+Wyłączenie:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.https.yml down
+```
 
 ### 1. Uruchomienie Web Serwisu
 

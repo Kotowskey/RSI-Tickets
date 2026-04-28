@@ -9,15 +9,20 @@ using SoapCore.Extensibility;
 QuestPDF.Settings.License = LicenseType.Community;
 
 var builder = WebApplication.CreateBuilder(args);
+var enableHttps = builder.Configuration.GetValue("Kestrel:EnableHttps", true);
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? "Data Source=flights.db";
 
 builder.WebHost.ConfigureKestrel(options =>
 {
     options.ListenAnyIP(5000);
-    options.ListenAnyIP(5001, listenOptions => listenOptions.UseHttps());
+    if (enableHttps)
+    {
+        options.ListenAnyIP(5001, listenOptions => listenOptions.UseHttps());
+    }
 });
 
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlite("Data Source=flights.db"));
+    options.UseSqlite(connectionString));
 
 builder.Services.AddScoped<IFlightReservationService, FlightReservationServiceImpl>();
 builder.Services.AddSingleton<IServiceOperationTuner, SoapLoggingHandler>();

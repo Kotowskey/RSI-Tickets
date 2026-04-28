@@ -1,11 +1,15 @@
 using FlightReservationAdminWeb.Soap;
 
 var builder = WebApplication.CreateBuilder(args);
+var enableHttps = builder.Configuration.GetValue("Kestrel:EnableHttps", true);
 
 builder.WebHost.ConfigureKestrel(options =>
 {
     options.ListenAnyIP(5002);
-    options.ListenAnyIP(5003, listen => listen.UseHttps());
+    if (enableHttps)
+    {
+        options.ListenAnyIP(5003, listen => listen.UseHttps());
+    }
 
     options.Limits.MaxRequestBodySize = 20 * 1024 * 1024;
 });

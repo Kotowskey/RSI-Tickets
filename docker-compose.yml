@@ -1,0 +1,31 @@
+services:
+  soap-service:
+    build:
+      context: .
+      dockerfile: FlightReservationService/Dockerfile
+    container_name: flight-reservation-soap
+    environment:
+      Kestrel__EnableHttps: "false"
+      ConnectionStrings__DefaultConnection: "Data Source=/app/data/flights.db"
+    ports:
+      - "5000:5000"
+    volumes:
+      - soap-db-data:/app/data
+    restart: unless-stopped
+
+  admin-web:
+    build:
+      context: .
+      dockerfile: FlightReservationAdminWeb/Dockerfile
+    container_name: flight-reservation-admin
+    environment:
+      Kestrel__EnableHttps: "false"
+      SoapService__Url: "http://soap-service:5000/FlightService.asmx"
+    depends_on:
+      - soap-service
+    ports:
+      - "5002:5002"
+    restart: unless-stopped
+
+volumes:
+  soap-db-data:

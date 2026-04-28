@@ -1,0 +1,20 @@
+services:
+  soap-service:
+    environment:
+      Kestrel__EnableHttps: "true"
+      ASPNETCORE_Kestrel__Certificates__Default__Path: "/https/aspnetapp.pfx"
+      ASPNETCORE_Kestrel__Certificates__Default__Password: "changeit123"
+    ports:
+      - "5001:5001"
+    volumes:
+      - ./certs:/https:ro
+
+  admin-web:
+    environment:
+      Kestrel__EnableHttps: "true"
+      ASPNETCORE_Kestrel__Certificates__Default__Path: "/https/aspnetapp.pfx"
+      ASPNETCORE_Kestrel__Certificates__Default__Password: "changeit123"
+    ports:
+      - "5003:5003"
+    volumes:
+      - ./certs:/https:ro
