@@ -55,10 +55,20 @@ class FlightReservationApp:
         frame.columnconfigure(1, weight=1)
 
     def _toggle_https(self):
-        if self.use_https_var.get():
-            self.url_var.set(WSDL_URL_HTTPS)
-        else:
-            self.url_var.set(WSDL_URL_HTTP)
+        current = self.url_var.get().strip() or WSDL_URL_HTTP
+        use_https = self.use_https_var.get()
+        try:
+            from urllib.parse import urlparse, urlunparse
+            parsed = urlparse(current)
+            host = parsed.hostname or "localhost"
+            new_scheme = "https" if use_https else "http"
+            new_port = 5001 if use_https else 5000
+            netloc = f"{host}:{new_port}"
+            path = parsed.path or "/FlightService.asmx"
+            query = parsed.query or "wsdl"
+            self.url_var.set(urlunparse((new_scheme, netloc, path, "", query, "")))
+        except Exception:
+            self.url_var.set(WSDL_URL_HTTPS if use_https else WSDL_URL_HTTP)
 
     def _connect(self):
         url = self.url_var.get().strip()
