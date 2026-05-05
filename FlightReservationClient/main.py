@@ -74,7 +74,8 @@ class FlightReservationApp:
             self.client = FlightSoapClient(url, verify_ssl=not self.use_https_var.get())
             self.root.after(0, self._on_connected)
         except Exception as e:
-            self.root.after(0, lambda: self._on_connect_error(str(e)))
+            err = str(e)
+            self.root.after(0, lambda err=err: self._on_connect_error(err))
 
     def _on_connected(self):
         self.connect_btn.config(state=tk.NORMAL)
@@ -153,7 +154,8 @@ class FlightReservationApp:
                 flights = self.client.get_all_flights()
             self.root.after(0, lambda: self._populate_flights(flights))
         except Exception as e:
-            self.root.after(0, lambda: self._show_error("Błąd pobierania lotów", str(e)))
+            err = str(e)
+            self.root.after(0, lambda err=err: self._show_error("Błąd pobierania lotów", err))
 
     def _populate_flights(self, flights):
         self.flights_data = flights
@@ -227,7 +229,8 @@ class FlightReservationApp:
             result = self.client.buy_ticket(flight_id, name, email)
             self.root.after(0, lambda: self._show_buy_result(result))
         except Exception as e:
-            self.root.after(0, lambda: self._show_error("Błąd zakupu", str(e)))
+            err = str(e)
+            self.root.after(0, lambda err=err: self._show_error("Błąd zakupu", err))
 
     def _show_buy_result(self, result):
         self.buy_result_text.delete("1.0", tk.END)
@@ -283,7 +286,8 @@ class FlightReservationApp:
             result = self.client.check_reservation(res_num)
             self.root.after(0, lambda: self._show_reservation_details(result))
         except Exception as e:
-            self.root.after(0, lambda: self._show_error("Błąd", str(e)))
+            err = str(e)
+            self.root.after(0, lambda err=err: self._show_error("Błąd", err))
 
     def _show_reservation_details(self, details):
         self.res_detail_text.delete("1.0", tk.END)
@@ -338,7 +342,8 @@ class FlightReservationApp:
             result = self.client.get_reservation_pdf(res_num)
             self.root.after(0, lambda: self._save_pdf(result))
         except Exception as e:
-            self.root.after(0, lambda: self._show_error("Błąd PDF", str(e)))
+            err = str(e)
+            self.root.after(0, lambda err=err: self._show_error("Błąd PDF", err))
 
     def _save_pdf(self, result):
         if not result.get("Success", False):
