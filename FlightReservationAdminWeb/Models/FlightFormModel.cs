@@ -58,5 +58,12 @@ public class FlightFormModel : IValidatableObject
                 "Miasto wylotu i przylotu muszą się różnić.",
                 [nameof(CityFrom), nameof(CityTo)]);
         }
+
+        if (DepartureDate.Date < DateTime.Today)
+        {
+            yield return new ValidationResult(
+                "Data wylotu nie może być w przeszłości.",
+                [nameof(DepartureDate)]);
+        }
     }
 }

@@ -299,6 +299,15 @@ public class FlightReservationServiceImpl : IFlightReservationService
         var validation = ValidateFlightRequest(request);
         if (validation != null) return validation;
 
+        if (FlightNumberExists(request.FlightNumber.Trim(), excludeId: 0))
+        {
+            return new FlightOperationResponse
+            {
+                Success = false,
+                Message = "Lot o tym numerze już istnieje.",
+            };
+        }
+
         var flight = new Flight
         {
             FlightNumber = request.FlightNumber.Trim(),
@@ -342,6 +351,16 @@ public class FlightReservationServiceImpl : IFlightReservationService
 
         var validation = ValidateFlightRequest(request);
         if (validation != null) return validation;
+
+        if (FlightNumberExists(request.FlightNumber.Trim(), excludeId: request.Id))
+        {
+            return new FlightOperationResponse
+            {
+                Success = false,
+                Message = "Lot o tym numerze już istnieje.",
+                FlightId = request.Id,
+            };
+        }
 
         flight.FlightNumber = request.FlightNumber.Trim();
         flight.CityFrom = request.CityFrom.Trim();
@@ -467,6 +486,8 @@ public class FlightReservationServiceImpl : IFlightReservationService
             return Fail("Miasto przylotu jest wymagane.");
         if (string.Equals(request.CityFrom.Trim(), request.CityTo.Trim(), StringComparison.OrdinalIgnoreCase))
             return Fail("Miasto wylotu i przylotu muszą się różnić.");
+        if (request.DepartureDate.Date < DateTime.Today)
+            return Fail("Data wylotu nie może być w przeszłości.");
         if (string.IsNullOrWhiteSpace(request.DepartureTime))
             return Fail("Godzina wylotu jest wymagana.");
         if (request.Price < 0)
@@ -480,5 +501,13 @@ public class FlightReservationServiceImpl : IFlightReservationService
             Success = false,
             Message = msg,
         };
+    }
+
+    private bool FlightNumberExists(string flightNumber, int excludeId)
+    {
+        var key = flightNumber.Trim();
+        return _db.Flights.AsNoTracking().Any(f =>
+            f.Id != excludeId
+            && f.FlightNumber.ToUpper() == key.ToUpper());
     }
 }
