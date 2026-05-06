@@ -10,6 +10,16 @@ WSDL_URL_HTTP = "http://localhost:5000/FlightService.asmx?wsdl"
 WSDL_URL_HTTPS = "https://localhost:5001/FlightService.asmx?wsdl"
 
 
+def _is_valid_email(email: str) -> bool:
+    s = email.strip()
+    if not s:
+        return False
+    i = s.find("@")
+    if i <= 0 or i != s.rfind("@") or i >= len(s) - 1:
+        return False
+    return True
+
+
 class FlightReservationApp:
     def __init__(self, root: tk.Tk):
         self.root = root
@@ -228,6 +238,12 @@ class FlightReservationApp:
         email = self.buy_email.get().strip()
         if not flight_id or not name or not email:
             messagebox.showwarning("Uwaga", "Wypełnij wszystkie pola.")
+            return
+        if not _is_valid_email(email):
+            messagebox.showwarning(
+                "Uwaga",
+                "Nieprawidłowy adres e-mail — potrzebny jest dokładnie jeden znak @ oraz tekst przed i po nim.",
+            )
             return
         try:
             flight_id_int = int(flight_id)

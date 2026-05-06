@@ -67,6 +67,15 @@ public class FlightReservationServiceImpl : IFlightReservationService
         _logger.LogInformation("BuyTicket called: FlightId={FlightId}, Passenger={Passenger}",
             request.FlightId, request.PassengerName);
 
+        if (!IsValidPassengerEmail(request.PassengerEmail))
+        {
+            return new TicketPurchaseResponse
+            {
+                Success = false,
+                Message = "Nieprawidłowy adres e-mail — potrzebny jest dokładnie jeden znak @ oraz tekst przed i po nim.",
+            };
+        }
+
         var flightId = request.FlightId;
         Reservation? reservation = null;
         string? flightNumber = null;
@@ -509,5 +518,15 @@ public class FlightReservationServiceImpl : IFlightReservationService
         return _db.Flights.AsNoTracking().Any(f =>
             f.Id != excludeId
             && f.FlightNumber.ToUpper() == key.ToUpper());
+    }
+
+    private static bool IsValidPassengerEmail(string raw)
+    {
+        var email = raw.Trim();
+        if (email.Length == 0) return false;
+        var i = email.IndexOf('@');
+        if (i <= 0 || i != email.LastIndexOf('@') || i >= email.Length - 1)
+            return false;
+        return true;
     }
 }
