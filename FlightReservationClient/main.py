@@ -147,6 +147,11 @@ class FlightReservationApp:
         if not self.client:
             messagebox.showwarning("Uwaga", "Najpierw połącz się z serwisem.")
             return
+        cf = self.search_from.get().strip()
+        ct = self.search_to.get().strip()
+        if cf and ct and cf.lower() == ct.lower():
+            messagebox.showwarning("Uwaga", "Miasto wylotu i przylotu muszą się różnić.")
+            return
         self.status_var.set("Wyszukiwanie...")
         search = {
             "city_from": self.search_from.get().strip() or None,

@@ -30,6 +30,14 @@ public class FlightReservationServiceImpl : IFlightReservationService
         _logger.LogInformation("SearchFlights called: From={From}, To={To}, Date={Date}",
             request.CityFrom, request.CityTo, request.Date);
 
+        var fromQ = request.CityFrom?.Trim();
+        var toQ = request.CityTo?.Trim();
+        if (!string.IsNullOrWhiteSpace(fromQ) && !string.IsNullOrWhiteSpace(toQ)
+            && string.Equals(fromQ, toQ, StringComparison.OrdinalIgnoreCase))
+        {
+            return new List<Flight>();
+        }
+
         var query = _db.Flights.AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(request.CityFrom))
@@ -457,6 +465,8 @@ public class FlightReservationServiceImpl : IFlightReservationService
             return Fail("Miasto wylotu jest wymagane.");
         if (string.IsNullOrWhiteSpace(request.CityTo))
             return Fail("Miasto przylotu jest wymagane.");
+        if (string.Equals(request.CityFrom.Trim(), request.CityTo.Trim(), StringComparison.OrdinalIgnoreCase))
+            return Fail("Miasto wylotu i przylotu muszą się różnić.");
         if (string.IsNullOrWhiteSpace(request.DepartureTime))
             return Fail("Godzina wylotu jest wymagana.");
         if (request.Price < 0)

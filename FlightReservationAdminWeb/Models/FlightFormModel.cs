@@ -2,7 +2,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace FlightReservationAdminWeb.Models;
 
-public class FlightFormModel
+public class FlightFormModel : IValidatableObject
 {
     public int Id { get; set; }
 
@@ -48,4 +48,15 @@ public class FlightFormModel
     public bool RemovePhoto { get; set; }
 
     public bool HasExistingPhoto { get; set; }
+
+    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+    {
+        if (!string.IsNullOrWhiteSpace(CityFrom) && !string.IsNullOrWhiteSpace(CityTo)
+            && string.Equals(CityFrom.Trim(), CityTo.Trim(), StringComparison.OrdinalIgnoreCase))
+        {
+            yield return new ValidationResult(
+                "Miasto wylotu i przylotu muszą się różnić.",
+                [nameof(CityFrom), nameof(CityTo)]);
+        }
+    }
 }
