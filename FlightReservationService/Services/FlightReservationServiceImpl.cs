@@ -59,46 +59,58 @@ public class FlightReservationServiceImpl : IFlightReservationService
         _logger.LogInformation("BuyTicket called: FlightId={FlightId}, Passenger={Passenger}",
             request.FlightId, request.PassengerName);
 
-        var flight = _db.Flights.Find(request.FlightId);
-        if (flight == null)
+        var flightId = request.FlightId;
+        Reservation? reservation = null;
+        string? flightNumber = null;
+
+        using var tx = _db.Database.BeginTransaction();
+        try
         {
-            return new TicketPurchaseResponse
+            var claimed = _db.Database.ExecuteSqlRaw(
+                "UPDATE Flights SET AvailableSeats = AvailableSeats - 1 WHERE Id = {0} AND AvailableSeats > 0",
+                flightId);
+
+            if (claimed == 0)
             {
-                Success = false,
-                Message = "Nie znaleziono lotu o podanym ID."
+                tx.Rollback();
+                var exists = _db.Flights.AsNoTracking().Any(f => f.Id == flightId);
+                return new TicketPurchaseResponse
+                {
+                    Success = false,
+                    Message = exists
+                        ? "Brak wolnych miejsc na ten lot."
+                        : "Nie znaleziono lotu o podanym ID.",
+                };
+            }
+
+            flightNumber = _db.Flights.AsNoTracking().Where(f => f.Id == flightId).Select(f => f.FlightNumber).First();
+
+            reservation = new Reservation
+            {
+                FlightId = flightId,
+                PassengerName = request.PassengerName,
+                PassengerEmail = request.PassengerEmail,
+                ReservationNumber = GenerateReservationNumber(),
+                PurchaseDate = DateTime.Now,
+                SeatNumber = $"{(char)('A' + Random.Shared.Next(6))}{Random.Shared.Next(1, 31)}"
             };
+
+            _db.Reservations.Add(reservation);
+            _db.SaveChanges();
+            tx.Commit();
+        }
+        catch
+        {
+            tx.Rollback();
+            throw;
         }
 
-        if (flight.AvailableSeats <= 0)
-        {
-            return new TicketPurchaseResponse
-            {
-                Success = false,
-                Message = "Brak dostępnych miejsc na tym locie."
-            };
-        }
-
-        flight.AvailableSeats--;
-
-        var reservation = new Reservation
-        {
-            FlightId = flight.Id,
-            PassengerName = request.PassengerName,
-            PassengerEmail = request.PassengerEmail,
-            ReservationNumber = GenerateReservationNumber(),
-            PurchaseDate = DateTime.Now,
-            SeatNumber = $"{(char)('A' + Random.Shared.Next(6))}{Random.Shared.Next(1, 31)}"
-        };
-
-        _db.Reservations.Add(reservation);
-        _db.SaveChanges();
-
-        _logger.LogInformation("Ticket purchased: ReservationNumber={ResNum}", reservation.ReservationNumber);
+        _logger.LogInformation("Ticket purchased: ReservationNumber={ResNum}", reservation!.ReservationNumber);
 
         return new TicketPurchaseResponse
         {
             Success = true,
-            Message = $"Bilet kupiony pomyślnie. Lot: {flight.FlightNumber}, Miejsce: {reservation.SeatNumber}",
+            Message = $"Bilet kupiony pomyślnie. Lot: {flightNumber}, Miejsce: {reservation.SeatNumber}",
             ReservationNumber = reservation.ReservationNumber
         };
     }

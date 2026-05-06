@@ -230,6 +230,26 @@ class FlightReservationApp:
             messagebox.showwarning("Uwaga", "ID lotu musi być liczbą.")
             return
 
+        for f in self.flights_data:
+            raw_id = f.get("Id")
+            try:
+                if int(raw_id) != flight_id_int:
+                    continue
+            except (TypeError, ValueError):
+                continue
+            seats = f.get("AvailableSeats", 0)
+            try:
+                seats = int(seats)
+            except (TypeError, ValueError):
+                seats = 0
+            if seats <= 0:
+                messagebox.showinfo(
+                    "Brak miejsc",
+                    "Na tym locie nie ma już wolnych miejsc. Wybierz inny lot lub odśwież listę.",
+                )
+                return
+            break
+
         self.status_var.set("Kupowanie biletu...")
         threading.Thread(target=self._buy_ticket_thread,
                          args=(flight_id_int, name, email), daemon=True).start()
@@ -259,6 +279,8 @@ class FlightReservationApp:
         self.buy_result_text.insert("1.0", "\n".join(lines))
         status_msg = f"Bilet kupiony: {res_num}" if success else f"Błąd: {message}"
         self.status_var.set(status_msg)
+        if self.client:
+            self._load_all_flights()
 
     # --- Reservation tab ---
     def _build_reservation_tab(self):
